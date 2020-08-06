@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="/js/qrcode.min.js"></script>
+    <script src="js/jquery-3.3.1.min.js"></script>
+</head>
+<div>
+    你的订单号为:<font id="orderId" color="red"></font>
+    金额:<font id="money" color="red"></font>
+    <font id="payStatus" color="red"></font>
+</div>
+<div id="qrcode"></div>
+<body>
+
+<script type="text/javascript">
+
+    $(function () {
+        initwechatPay();
+    })
+
+
+    //=================ajax的全局处理
+    $.ajaxSetup({
+        headers: {
+            'token': sessionStorage.getItem("login_token"),
+        },
+    });
+
+
+
+    var codeUrl;
+    function initwechatPay(){
+        //获取订单号：
+        var infoStr = sessionStorage.getItem("orderInfo");
+        var item = sessionStorage.getItem("money");
+        alert(infoStr);
+        //将订单号和金额展示到页面上
+        $("#orderId").html(infoStr);
+        $("#money").html(item);
+
+
+        $.post({
+            url:"http://localhost:8080/OrderController/weChatPay",
+            dataType:"json",
+            data:{"orderId":infoStr},
+            success:function (rs) {
+                if(rs.code==200){
+                    if(rs.data.code==200){
+
+                        codeUrl = rs.data.url;
+                        alert(codeUrl)
+                        new QRCode(document.getElementById("qrcode"), rs.data.url);  // 设置要生成二维码的链接
+
+                        // 页面请求支付状态  5秒
+                        setInterval(queryPayStatus,1000*5);
+
+                    }else {
+                        alert("微信支付生成二维码异常："+rs.data.info);
+                    }
+                }
+
+            },
+            error:function () {
+                alert("返回二维码的链接异常！");
+            }
+        });
+    }
+
+
+    //查询订单状态
+    function queryPayStatus() {
+        var infoStr = sessionStorage.getItem("orderInfo");
+        var infoObj=JSON.parse(infoStr);
+        var oid=infoObj.orderId;
+        $.post({
+            url:"http://localhost:8080/OrderController/queryPayStatus",
+            dataType:"json",
+            data:{"orderId":oid},
+            success:function (rs) {
+                if(rs.data==0){
+                    alert("支付异常： 请联系客户");
+                }else if (rs.data==1) {
+                    location.href="success.html"
+                }else if(rs.data==2){
+                    $("#payStatus").html("用户支付中");
+                }else if(rs.data==3){
+                    $("#payStatus").html("用户还没操作");
+                }
+            },
+            error:function () {
+                alert("查询订单支付状态异常！");
+            }
+        })
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+</script>
+
+</body>
+</html>

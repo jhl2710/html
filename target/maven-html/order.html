@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+    <script src="js/jquery-3.3.1.min.js"></script>
+</head>
+<body>
+
+<div> <!-- 收货地址的增查-->
+    <b>收货地址：</b>
+    <table border="1"  cellspacing="0"  id="addressDiv">
+
+    </table>
+</div>
+
+<div>
+    <b>支付方式：</b><br>
+    <input type="radio" name="payType" value="0" /> 在线支付
+    <input type="radio" name="payType" value="1" />货到付款
+</div>
+
+
+<div id="productInfo">
+    <b>购物清单：</b>
+    <table border="2"  cellspacing="0" width="400px" id="CartGoodsDiv">
+
+    </table>
+</div>
+<br>
+<span style="color: red ;margin-left: 300px">总计：</span><span style="color: red " id="totalMoney_jhl">0</span>
+
+<br>
+<br>
+<button id="cd" onclick="createOrder()">提交订单</button>
+
+</body>
+<script>
+
+
+    $(function () {
+        queryAddress();
+        initGoodsCart();
+
+        //生成一个请求的唯一标示
+        sendFlag=new Date().getTime();
+    })
+
+    //=================ajax的全局处理
+    $.ajaxSetup({
+        //data:{"name":sessionStorage.getItem("token")}//第一种
+        headers: {
+            'token': sessionStorage.getItem("login_token"),
+            // 'iphone': sessionStorage.getItem("iphone")
+        },
+        /* beforeSend: function(xhr) {
+             debugger;
+             xhr.setRequestHeader("token:'"+sessionStorage.getItem("login_token")+"'");//第三种
+         }*/
+
+        //数据加载完成后
+        complete:function(a,b,c){
+            var rs=a.responseJSON;
+            if(rs.code==1000){
+                alert(rs.message);
+                location.href="login.html"
+            }
+        }
+    });
+
+
+    //查询收货地址
+    function queryAddress() {
+        $.post({
+            url:"http://localhost:8080/AddressController/queryAddress",
+            dataType:"json",
+            success:function (rs) {
+                if(rs.code==200){
+                    var addressArr=rs.data;
+                    var htmls="";
+                    var radioHtml=""
+                    for (var i = 0; i <addressArr.length ; i++) {
+                        if(addressArr[i].ischeck==true){
+                            radioHtml='<td><input type="radio" checked name="addressRadio" value="'+addressArr[i].id+'"/></td>'
+                        }else{
+                            radioHtml='<td><input type="radio"  name="addressRadio" value="'+addressArr[i].id+'"/></td>'
+                        }
+                        htmls+=' <tr>\n' +
+                            radioHtml+
+                            '          <td>'+addressArr[i].name+'</td>\n' +
+                            '          <td>'+addressArr[i].iPhone+'</td>\n' +
+                            '          <td>'+addressArr[i].address+'</td>\n' +
+                            '        </tr>';
+                    }
+                    //将拼好的html 填充到div中
+                    $("#addressDiv").html(htmls);
+                }else{
+                    alert(rs.message);
+                }
+            },error:function () {
+                alert("获取收货地址异常");
+            }
+        });
+    }
+
+
+    //查询购物车里的商品信息
+    function initGoodsCart() {
+        $.post({
+            url:"http://localhost:8080/CartController/queryGoodsCheckCart",
+            dataType:"json",
+            success:function (rs) {
+                if(rs.code==200){
+                    //拿到商品信息
+                    var CartGoodsData=rs.data;
+                    var htmls="";//拼好显示的html[
+                    var totalMoney=0;
+                    for (var i = 0; i <CartGoodsData.length ; i++) {
+
+                        //拿到具体的一个
+                        var cg=CartGoodsData[i];
+                        totalMoney+=cg.money;
+                        htmls+=' <tr>\n' +
+                            '          <td>'+cg.name+'</td>\n' +
+                            '          <td><img src="'+cg.imgpath+'" style="width: 100px"/></td>\n' +
+                            '          <td>价格：'+cg.price+'</td>\n' +
+                            '          <td>数量：'+cg.count+'</td>\n' +
+                            '          <td>小计：'+cg.money+'</td>\n' +
+                            '      </tr>';
+                    }
+
+                    $("#CartGoodsDiv").html(htmls);
+                    $("#totalMoney_jhl").html(totalMoney);
+                }
+
+            },error:function () {
+                alert("获取购物车数据异常");
+            }
+        });
+    }
+
+
+    //创建订单
+    function createOrder() {
+        // 按钮置灰
+        $("#cb").attr("disabled",true);
+
+       var payType = $("[name='payType']:checked").val();//获取支付方式
+       var addressId = $("[name='addressRadio']:checked").val();//获取选中的收货地址
+        $.post({
+            url:"http://localhost:8080/OrderController/addOrder",
+            dataType:"json",
+            data:{"payType":payType,"addressId":addressId,"flag":sendFlag},
+            success:function (rs) {
+                alert(JSON.stringify(rs));
+                if(rs.code==200){//请求成功
+                    alert("生成订单成功");
+                    var str=JSON.stringify(rs.data.orderId);
+                    var money=JSON.stringify(rs.data.totalMoney);
+                    sessionStorage.setItem("orderInfo",str);
+                    sessionStorage.setItem("money",money);
+                    location.href="ewm.html"
+                }else if (rs.code==2000) {
+                    alert(rs.message);
+                }else if(rs.code==300){
+                    alert("请求处理中 不要多次点击");
+                }
+
+            },
+            error:function () {
+                alert("创建订单异常！");
+            }
+        })
+
+
+    }
+
+</script>
+    <style>
+        div{
+            margin-top: 30px;
+        }
+    </style>
+</html>
